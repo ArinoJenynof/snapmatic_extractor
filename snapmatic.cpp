@@ -1,34 +1,40 @@
-#include <cstdlib>
+#include <iostream>
 #include <fstream>
 #include <filesystem>
+#include <array>
 
 int main()
 {
-	namespace fs = std::filesystem;
-	const fs::path userprofile = std::getenv("USERPROFILE");
-	const fs::path rgsc = userprofile / "Documents\\Rockstar Games\\GTA V\\Profiles";
-	std::error_code ec;
+	using namespace std::filesystem;
 
-	for (const fs::directory_entry &profile : fs::directory_iterator(rgsc))
+	const path USERPROFILE { std::getenv("USERPROFILE") };
+	const std::array profile_dirs {
+		USERPROFILE / "Documents" / "Rockstar Games" / "GTA V" / "Profiles",
+		USERPROFILE / "Documents" / "Rockstar Games" / "GTAV Enhanced" / "Profiles"
+	};
+
+	for (const path& profile_dir : profile_dirs)
 	{
-		const fs::path outdir = profile.path().filename();
-		fs::create_directory(outdir, ec);
-
-		for (const fs::directory_entry &dirent : fs::directory_iterator(profile))
+		for (const directory_entry& profile : directory_iterator { profile_dir })
 		{
-			const fs::path filename = dirent.path().filename();
-			if (filename.string().substr(0, 4) == "PGTA")
+			std::error_code ec {};
+			const path outdir { profile.path().filename() };
+			create_directories(outdir, ec);
+
+			for (const directory_entry& pic : directory_iterator { profile })
 			{
-				const fs::path outfile = filename.string() + ".jpg";
+				if (pic.path().filename().string().substr(0, 4) == "PGTA")
+				{
+					const path outfile { outdir / (pic.path().filename().string() + ".jpg") };
+					if (exists(outfile, ec))
+						continue;
+					const path infile { pic.path() };
 
-				if (fs::exists(outdir / outfile, ec))
-					continue;
-
-				std::ifstream inp(dirent.path(), std::ios::binary);
-				std::ofstream out(outdir / outfile, std::ios::binary);
-
-				inp.seekg(292);
-				out << inp.rdbuf();
+					std::ifstream snap_in { infile, std::ios::binary };
+					std::ofstream snap_out { outfile, std::ios::binary };
+					snap_in.seekg(292);
+					snap_out << snap_in.rdbuf();
+				}
 			}
 		}
 	}
